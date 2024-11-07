@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react'
+import { useQuery } from 'react-query'
 import CryptoList from './components/CryptoList'
 import Header from './components/Header'
 import Filters from './components/Filters'
+import StrategyBuilder from './components/StrategyBuilder'
+import TradingChart from './components/TradingChart'
+import BotDashboard from './components/BotDashboard'
+import ActiveStrategies from './components/ActiveStrategies'
 import { fetchCryptoData } from './services/api'
+import { TradingBot } from './services/tradingBot'
 
 function App() {
-  const [cryptos, setCryptos] = useState([])
-  const [filteredCryptos, setFilteredCryptos] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [selectedCrypto, setSelectedCrypto] = useState(null)
+  const [strategies, setStrategies] = useState([])
   const [filters, setFilters] = useState({
     search: '',
     minPrice: '',
@@ -15,25 +20,78 @@ function App() {
     sortBy: 'market_cap_desc'
   })
 
+  const { data: cryptos = [], isLoading } = useQuery(
+    'cryptoData',
+    fetchCryptoData,
+    {
+      refetchInterval: 30000,
+    }
+  )
+
+  const [bot, setBot] = useState(null)
+  const [botMetrics, setBotMetrics] = useState({
+    totalProfit: 0,
+    winRate: 0,
+    activeTrades: 0,
+    recentTrades: []
+  })
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const data = await fetchCryptoData()
-        setCryptos(data)
-        setFilteredCryptos(data)
-        setLoading(false)
-      } catch (error) {
-        console.error('Error fetching data:', error)
-        setLoading(false)
-      }
+    if (cryptos.length > 0 && bot) {
+      cryptos.forEach(crypto => {
+        bot.evaluatePrice(crypto)
+      })
+      setBotMetrics(bot.getMetrics())
+    }
+  }, [cryptos, bot])
+
+  const addStrategy = (strategy) => {
+    const newStrategy = {
+      ...strategy,
+      id: Date.now(),
+      active: true,
+      profit: 0,
+      type: strategy.name.split(' - ')[0],
+      createdAt: new Date()
     }
 
-    fetchData()
-    const interval = setInterval(fetchData, 30000)
-    return () => clearInterval(interval)
-  }, [])
+    const newBot = new TradingBot({
+      buyCondition: (price, priceChange) => {
+        try {
+          return eval(strategy.buyCondition)
+        } catch (error) {
+          console.error('Buy condition evaluation error:', error)
+          return false
+        }
+      },
+      sellCondition: (price, priceChange) => {
+        try {
+          return eval(strategy.sellCondition)
+        } catch (error) {
+          console.error('Sell condition evaluation error:', error)
+          return false
+        }
+      },
+      params: strategy.params
+    })
+    
+    setBot(newBot)
+    setStrategies(prev => [...prev, newStrategy])
+  }
 
-  useEffect(() => {
+  const toggleStrategy = (strategyId) => {
+    setStrategies(prev => prev.map(strategy => 
+      strategy.id === strategyId 
+        ? { ...strategy, active: !strategy.active }
+        : strategy
+    ))
+  }
+
+  const deleteStrategy = (strategyId) => {
+    setStrategies(prev => prev.filter(strategy => strategy.id !== strategyId))
+  }
+
+  const filteredCryptos = React.useMemo(() => {
     let result = [...cryptos]
 
     if (filters.search) {
@@ -65,14 +123,39 @@ function App() {
         break
     }
 
-    setFilteredCryptos(result)
-  }, [filters, cryptos])
+    return result
+  }, [cryptos, filters])
 
   return (
-    <div className="min-h-screen p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-gray-900">
       <Header />
-      <Filters filters={filters} setFilters={setFilters} />
-      <CryptoList cryptos={filteredCryptos} loading={loading} />
+      <main className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <BotDashboard botMetrics={botMetrics} activeStrategies={strategies} />
+            <ActiveStrategies 
+              strategies={strategies}
+              onToggle={toggleStrategy}
+              onDelete={deleteStrategy}
+            />
+          </div>
+          <StrategyBuilder onCreateStrategy={addStrategy} />
+          {selectedCrypto && (
+            <TradingChart 
+              data={selectedCrypto.chartData} 
+              symbol={selectedCrypto.symbol}
+            />
+          )}
+          <div className="bg-gray-800 rounded-lg p-6">
+            <Filters filters={filters} setFilters={setFilters} />
+            <CryptoList 
+              cryptos={filteredCryptos} 
+              loading={isLoading}
+              onSelect={setSelectedCrypto}
+            />
+          </div>
+        </div>
+      </main>
     </div>
   )
 }
