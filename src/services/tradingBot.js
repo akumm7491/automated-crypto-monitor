@@ -17,13 +17,14 @@ export class TradingBot {
 
     // Example strategy evaluation
     if (this.shouldBuy(crypto)) {
-      this.executeBuy(symbol, price, crypto)
+      this.executeBuy(symbol, price)
     } else if (this.shouldSell(crypto)) {
-      this.executeSell(symbol, price, crypto)
+      this.executeSell(symbol, price)
     }
   }
 
   shouldBuy(crypto) {
+    // Implement strategy buy conditions
     const price = crypto.current_price
     const priceChange = crypto.price_change_percentage_24h
 
@@ -31,31 +32,26 @@ export class TradingBot {
   }
 
   shouldSell(crypto) {
+    // Implement strategy sell conditions
     const price = crypto.current_price
     const priceChange = crypto.price_change_percentage_24h
 
     return this.strategy.sellCondition(price, priceChange)
   }
 
-  executeBuy(symbol, price, crypto) {
+  executeBuy(symbol, price) {
     if (!this.activeTrades.has(symbol)) {
       const trade = {
         entryPrice: price,
         time: new Date(),
-        symbol,
-        pair: `${symbol}/USD`,
-        type: 'BUY',
-        price: price,
-        profit: 0
+        symbol
       }
       this.activeTrades.set(symbol, trade)
       this.metrics.activeTrades++
-      this.trades.unshift(trade) // Add to beginning of array
-      if (this.trades.length > 50) this.trades.pop() // Keep only last 50 trades
     }
   }
 
-  executeSell(symbol, price, crypto) {
+  executeSell(symbol, price) {
     const trade = this.activeTrades.get(symbol)
     if (trade) {
       const profit = price - trade.entryPrice
@@ -63,18 +59,12 @@ export class TradingBot {
       this.metrics.totalTrades++
       if (profit > 0) this.metrics.winCount++
       
-      const sellTrade = {
+      this.trades.push({
         ...trade,
-        type: 'SELL',
         exitPrice: price,
-        price: price,
-        profit: profit,
-        exitTime: new Date(),
-        time: new Date()
-      }
-      
-      this.trades.unshift(sellTrade) // Add to beginning of array
-      if (this.trades.length > 50) this.trades.pop() // Keep only last 50 trades
+        profit,
+        exitTime: new Date()
+      })
       
       this.activeTrades.delete(symbol)
       this.metrics.activeTrades--
@@ -86,7 +76,7 @@ export class TradingBot {
       totalProfit: this.metrics.totalProfit,
       winRate: this.metrics.totalTrades > 0 ? this.metrics.winCount / this.metrics.totalTrades : 0,
       activeTrades: this.metrics.activeTrades,
-      recentTrades: this.trades
+      recentTrades: this.trades.slice(-10).reverse()
     }
   }
 }

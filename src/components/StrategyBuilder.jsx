@@ -9,8 +9,8 @@ const strategyTemplates = {
     presets: [
       {
         name: "Simple Moving Average Crossover",
-        buyCondition: "price > sma20 && sma20 > sma50",
-        sellCondition: "price < sma20 && sma20 < sma50",
+        buyCondition: "price > sma20 && sma20 > sma50 && priceChange > 0",
+        sellCondition: "price < sma20 && sma20 < sma50 || priceChange < -2",
         params: {
           shortPeriod: 20,
           longPeriod: 50
@@ -19,7 +19,7 @@ const strategyTemplates = {
       {
         name: "RSI Momentum",
         buyCondition: "rsi < 30 && priceChange > 0",
-        sellCondition: "rsi > 70",
+        sellCondition: "rsi > 70 || priceChange < -3",
         params: {
           rsiPeriod: 14
         }
@@ -33,8 +33,8 @@ const strategyTemplates = {
     presets: [
       {
         name: "Bollinger Bands Bounce",
-        buyCondition: "price < bollingerLower",
-        sellCondition: "price > bollingerUpper",
+        buyCondition: "price < bollingerLower && rsi < 40",
+        sellCondition: "price > bollingerUpper || rsi > 60",
         params: {
           period: 20,
           standardDeviations: 2
@@ -49,7 +49,7 @@ const strategyTemplates = {
     presets: [
       {
         name: "Oversold Bounce",
-        buyCondition: "rsi < 20 && price < sma20",
+        buyCondition: "rsi < 20 && price < sma20 * 0.95",
         sellCondition: "rsi > 60 || price > sma20 * 1.05",
         params: {
           rsiPeriod: 14,
@@ -64,21 +64,22 @@ const strategyTemplates = {
     description: "Trades based on time patterns",
     presets: [
       {
-        name: "Daily Range Trader",
-        buyCondition: "hour >= 9 && price < dailyLow * 1.02",
-        sellCondition: "hour >= 15 || price > dailyHigh * 0.98",
+        name: "Volume-Time Strategy",
+        buyCondition: "hour >= 9 && hour <= 16 && volume > 1000000 && priceChange > 1",
+        sellCondition: "hour >= 15 || priceChange < -2 || volume < 500000",
         params: {
           tradingHours: {
             start: 9,
             end: 16
-          }
+          },
+          minVolume: 1000000
         }
       }
     ]
   }
 }
 
-export default function StrategyBuilder({ onCreateStrategy }) {
+function StrategyBuilder({ onCreateStrategy }) {
   const [selectedTemplate, setSelectedTemplate] = useState(null)
   const [selectedPreset, setSelectedPreset] = useState(null)
   const [customParams, setCustomParams] = useState({})
@@ -106,6 +107,9 @@ export default function StrategyBuilder({ onCreateStrategy }) {
     }
 
     onCreateStrategy(strategy)
+    setSelectedTemplate(null)
+    setSelectedPreset(null)
+    setCustomParams({})
   }
 
   return (
@@ -195,3 +199,5 @@ export default function StrategyBuilder({ onCreateStrategy }) {
     </div>
   )
 }
+
+export default StrategyBuilder

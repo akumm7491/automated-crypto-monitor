@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useQuery } from 'react-query'
+import { useQuery } from '@tanstack/react-query'
 import CryptoList from './components/CryptoList'
 import Header from './components/Header'
 import Filters from './components/Filters'
@@ -20,13 +20,11 @@ function App() {
     sortBy: 'market_cap_desc'
   })
 
-  const { data: cryptos = [], isLoading } = useQuery(
-    'cryptoData',
-    fetchCryptoData,
-    {
-      refetchInterval: 30000,
-    }
-  )
+  const { data: cryptos = [], isLoading } = useQuery({
+    queryKey: ['cryptoData'],
+    queryFn: fetchCryptoData,
+    refetchInterval: 30000,
+  })
 
   const [bot, setBot] = useState(null)
   const [botMetrics, setBotMetrics] = useState({
